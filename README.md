@@ -1,6 +1,7 @@
 # CAPS Guard
 
 Guardrails + audit-grade traces for tool-calling AI workflows.
+Standalone guardrail + audit layer dev tool (v0.1).
 
 ## What Problem It Solves
 AI workflows can make side-effect calls (message/email/calendar/etc.) without clear policy visibility.
@@ -37,10 +38,56 @@ In practice, that means:
 - Define policy coverage for those tools.
 - Use CAPS adapters directly, or wrap existing tool/API calls so CAPS Guard evaluates them before execution.
 This is deliberate for v0.1: CAPS Guard is an integration boundary, not a zero-config global wrapper.
+If your tool calls are already routed through clean adapter boundaries, integration is usually a few minutes (manifest + one routing point). If tool calls are scattered across your codebase, integrate adapters first.
 
 New tools require two things:
 - Manifest coverage: define tool name, side-effect class, sink behavior, and relevant policies.
 - Adapter coverage: route the actual tool/API call through CAPS Guard so policy is evaluated before execution.
+
+<details>
+  <summary>Implementation Details: before/after adapter wrapping pattern</summary>
+
+  This mirrors the repo's runtime pattern (`core.manifest_loader` + `core.policy_engine` + adapter call), simplified for clarity.
+
+  **Before (direct adapter/API call, no guard):**
+  ```python
+  from adapters.messaging_api import send_message
+
+  def send_message_tool(message: str):
+      params = {"recipient_ref": "Jacob", "message": message}
+      request_context = {"thread_id": "demo1"}
+      return send_message(params, request_context, trace_id="trace_local")
+  ```
+
+  **After (policy-gated at execution boundary):**
+  ```python
+  from adapters.messaging_api import send_message
+  from core.manifest_loader import build_manifest_context, load_manifest
+  from core.policy_engine import evaluate_tool_policy
+
+  manifest = load_manifest("src/manifest_demo.json")
+  manifest_context = build_manifest_context(manifest)
+
+  def send_message_tool(message: str):
+      params = {"recipient_ref": "Jacob", "message": message}
+      decision = evaluate_tool_policy(
+          step_id="send_message_step",
+          tool_name="messaging_api",
+          params=params,
+          manifest_context=manifest_context,
+          approved_for_sink=False,  # switch true on explicit human approval path
+          trace_id="trace_local",
+      )
+
+      if decision["decision"] == "ALLOW":
+          return send_message(params, {"thread_id": "demo1"}, trace_id="trace_local")
+      if decision["decision"] == "REVIEW_REQUIRED":
+          raise RuntimeError(f"review required: {decision['reason_code']}")
+      raise RuntimeError(f"blocked: {decision['reason_code']}")
+  ```
+
+  For LangGraph/CrewAI/custom loops, this wrapper belongs in your tool node/executor; no framework rewrite is required.
+</details>
 
 ## Can I Use This With My Stack?
 You can likely use CAPS Guard if:
