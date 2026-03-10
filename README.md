@@ -6,28 +6,49 @@ Guardrails + audit-grade traces for tool-calling AI workflows.
 AI workflows can make side-effect calls (message/email/calendar/etc.) without clear policy visibility.
 CAPS Guard enforces deterministic policy decisions at the tool boundary and emits trace artifacts that explain exactly what happened and why.
 
-## Core Concepts
-### Tool Execution Boundary
-- Every tool step is evaluated before execution.
-- Decision outcomes are deterministic: `ALLOW`, `REVIEW_REQUIRED`, `BLOCK`.
+## Who This Is For / When To Use It
+CAPS Guard is for developers building tool-calling AI workflows who want deterministic policy checks, human approval for risky actions, and auditable traces at the execution boundary.
+v0.1 works best when your tool/API calls can be routed through CAPS manifests and adapters. It is not yet a drop-in wrapper for every existing agent framework.
 
-### Policy Decisions
-- Decisions are manifest-driven (`src/manifest*.json`), not hardcoded in runtime flow.
-- Precedence is deterministic (`BLOCK > REVIEW_REQUIRED > ALLOW`).
-- Decision payload includes `reason_code` and `rule_id` for auditability.
+## What This Is / What This Is Not
+What this is:
+- A guardrail and audit layer for tool-calling AI workflows.
+- Deterministic `ALLOW | REVIEW_REQUIRED | BLOCK` decisions.
+- Human approval for risky side effects.
+- Trace artifacts for execution and review history.
 
-### HITL Review
-- If policy returns `REVIEW_REQUIRED` for an actionable sink step, execution pauses.
-- Resume path uses explicit human decision (`approve` or `reject`).
+What this is not:
+- Not a universal wrapper for every LLM app out of the box.
+- Not a full agent framework.
+- Not a no-code tool.
+- Not a hosted review platform in v0.1.
 
-### Trace Artifacts
-- `trace.json`: canonical event log for decisions/tool calls/results/final summary.
-- `trace_graph.json`: deterministic nodes/edges execution-path view derived from `trace.json`.
+## Adoption Boundary (How Integration Works)
+To use CAPS Guard, your workflow must route tool execution through CAPS Guard’s execution boundary.
+In practice, that means:
+- Register tools in a manifest.
+- Define policy coverage for those tools.
+- Use CAPS adapters directly, or wrap existing tool/API calls so CAPS Guard evaluates them before execution.
+
+New tools require two things:
+- Manifest coverage: define tool name, side-effect class, sink behavior, and relevant policies.
+- Adapter coverage: route the actual tool/API call through CAPS Guard so policy is evaluated before execution.
+
+## Can I Use This With My Stack?
+You can likely use CAPS Guard if:
+- Your app/agent makes tool or API calls.
+- You control the tool execution layer.
+- You can route calls through manifests/adapters or thin wrappers.
+
+You probably cannot use it directly yet if:
+- Your stack hides execution in a closed runtime you cannot intercept.
+- You want zero integration work.
+- You expect automatic support for arbitrary tools without manifest/adapter mapping.
 
 ## Install
 Requirements:
 - Python 3.10+
-- Ollama running locally (for prompt/langgraph paths)
+- Ollama running locally (only for prompt/langgraph paths)
 - Pulled local model (default from `src/config.py`)
 
 Setup:
@@ -43,7 +64,14 @@ docker build -t caps-guard:local .
 docker run --rm caps-guard:local --help
 ```
 
-## Quickstart
+If `docker` is not found on macOS but Docker Desktop is installed:
+```bash
+export PATH="/Applications/Docker.app/Contents/Resources/bin:$PATH"
+hash -r
+docker --version
+```
+
+## Quickest Path To First Value
 Policy check without execution:
 ```bash
 python scripts/caps_guard.py check \
@@ -61,40 +89,6 @@ python scripts/caps_guard.py execute \
   --output-dir /tmp/guard_execute_demo
 ```
 
-## Example Manifest Profiles
-Use these profiles to validate the three v0.1 policy proofs:
-
-- `src/manifest_demo.json`: primary profile (alias of default policy profile used for demos).
-- `src/manifest_side_effect_demo.json`: side-effect class policy proof:
-  - `WRITE` non-sink -> `REVIEW_REQUIRED` (`rule_id=REVIEW_WRITE_CLASS`)
-  - `IRREVERSIBLE` -> `BLOCK` (`rule_id=BLOCK_IRREVERSIBLE`)
-- `src/manifest_args_demo.json`: argument-level block proof:
-  - forbidden args -> `BLOCK` (`reason_code=ARGS_FORBIDDEN_PATTERN`)
-
-Side-effect class proof commands:
-```bash
-python scripts/caps_guard.py check \
-  --manifest src/manifest_side_effect_demo.json \
-  --tool messaging_api \
-  --args-json '{"message":"hi"}' \
-  --output-dir /tmp/sidefx_check_write
-
-python scripts/caps_guard.py check \
-  --manifest src/manifest_side_effect_demo.json \
-  --tool calendar_api \
-  --args-json '{"title":"deploy"}' \
-  --output-dir /tmp/sidefx_check_irrev
-```
-
-Argument-block proof command:
-```bash
-python scripts/caps_guard.py check \
-  --manifest src/manifest_args_demo.json \
-  --tool weather_api \
-  --args-json '{"query":"drop table users"}' \
-  --output-dir /tmp/args_demo_check
-```
-
 Containerized check demo (no local Python env needed):
 ```bash
 docker run --rm caps-guard:local check \
@@ -104,8 +98,8 @@ docker run --rm caps-guard:local check \
   --output-dir /tmp/args_demo_check
 ```
 
-## End-to-End Demo Flow
-Use this exact flow for v0.1 demo (pause on sink, then approve):
+## Richer End-to-End Prompt Flow (Pause/Resume)
+Use this exact v0.1 flow to show pause on sink and explicit approval resume:
 
 ```bash
 rm -f .caps_guard_demo.sqlite
@@ -140,6 +134,36 @@ Expected behavior:
 - Resume run emits `review_resume` and completes sink execution.
 - `trace_id` remains stable across pause/resume for the same thread.
 
+## Ollama / LangGraph Notes
+- `check` and `execute --plan` paths do not require prompt parsing.
+- Prompt-driven execution (`execute --prompt`) uses the LangGraph pipeline and local model/runtime configuration.
+- Keep Ollama available when using prompt mode.
+
+## Example Manifest Profiles
+Use these profiles to validate v0.1 policy proofs:
+
+- `src/manifest_demo.json`: primary profile (alias of default policy profile used for demos).
+- `src/manifest_side_effect_demo.json`: side-effect class policy proof:
+  - `WRITE` non-sink -> `REVIEW_REQUIRED` (`rule_id=REVIEW_WRITE_CLASS`)
+  - `IRREVERSIBLE` -> `BLOCK` (`rule_id=BLOCK_IRREVERSIBLE`)
+- `src/manifest_args_demo.json`: argument-level block proof:
+  - forbidden args -> `BLOCK` (`reason_code=ARGS_FORBIDDEN_PATTERN`)
+
+Side-effect class proof commands:
+```bash
+python scripts/caps_guard.py check \
+  --manifest src/manifest_side_effect_demo.json \
+  --tool messaging_api \
+  --args-json '{"message":"hi"}' \
+  --output-dir /tmp/sidefx_check_write
+
+python scripts/caps_guard.py check \
+  --manifest src/manifest_side_effect_demo.json \
+  --tool calendar_api \
+  --args-json '{"title":"deploy"}' \
+  --output-dir /tmp/sidefx_check_irrev
+```
+
 Blocked demo (`ARGS_FORBIDDEN_PATTERN`):
 ```bash
 python scripts/caps_guard.py check \
@@ -148,6 +172,24 @@ python scripts/caps_guard.py check \
   --args-json '{"query":"drop table users"}' \
   --output-dir /tmp/args_demo_check
 ```
+
+## Core Concepts
+### Tool Execution Boundary
+- Every tool step is evaluated before execution.
+- Decision outcomes are deterministic: `ALLOW`, `REVIEW_REQUIRED`, `BLOCK`.
+
+### Policy Decisions
+- Decisions are manifest-driven (`src/manifest*.json`), not hardcoded in runtime flow.
+- Precedence is deterministic (`BLOCK > REVIEW_REQUIRED > ALLOW`).
+- Decision payload includes `reason_code` and `rule_id` for auditability.
+
+### HITL Review
+- If policy returns `REVIEW_REQUIRED` for an actionable sink step, execution pauses.
+- Resume path uses explicit human decision (`approve` or `reject`).
+
+### Trace Artifacts
+- `trace.json`: canonical event log for decisions/tool calls/results/final summary.
+- `trace_graph.json`: deterministic nodes/edges execution-path view derived from `trace.json`.
 
 ## Trace Schema Overview
 Decision outcomes (v0.1):
@@ -216,10 +258,10 @@ Schema stability statement (v0.1):
 - New fields may be added, but existing documented fields are not intended to be renamed/removed in v0.1.
 
 ## Current Limitations
-- Works for the current supported tool/step model.
-- New tools require manifest policy coverage and adapter coverage.
-- `trace_graph.json` is an execution-path graph (sequential nodes/edges), not a full branch tree.
-- Env-aware policy matrix (`dev/stage/prod`) is post-v0.1.
+- Supports the current tool/step model.
+- New tools require manifest + adapter coverage.
+- `trace_graph.json` is currently sequential execution flow, not a full branch tree.
+- Env-aware rules are not in v0.1 (Slice D scope).
 - Hosted review workflows are out of scope for v0.1.
 
 ## Roadmap / What’s Next
