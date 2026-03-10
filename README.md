@@ -6,6 +6,12 @@ Guardrails + audit-grade traces for tool-calling AI workflows.
 AI workflows can make side-effect calls (message/email/calendar/etc.) without clear policy visibility.
 CAPS Guard enforces deterministic policy decisions at the tool boundary and emits trace artifacts that explain exactly what happened and why.
 
+## Start Here (2-Minute Scan)
+- Audience: developers/teams building tool-calling workflows who control the execution boundary.
+- Value: deterministic policy decisions (`ALLOW | REVIEW_REQUIRED | BLOCK`), HITL for risky actions, and auditable trace artifacts.
+- Adoption model: register tools in manifests and route calls through CAPS adapters or thin wrappers.
+- Fastest trial path: run `check` and `execute --plan` first; prompt flow is richer and needs local model runtime.
+
 ## Who This Is For / When To Use It
 CAPS Guard is for developers building tool-calling AI workflows who want deterministic policy checks, human approval for risky actions, and auditable traces at the execution boundary.
 v0.1 works best when your tool/API calls can be routed through CAPS manifests and adapters. It is not yet a drop-in wrapper for every existing agent framework.
@@ -195,7 +201,9 @@ python scripts/caps_guard.py check \
 - `trace.json`: canonical event log for decisions/tool calls/results/final summary.
 - `trace_graph.json`: deterministic nodes/edges execution-path view derived from `trace.json`.
 
-## Trace Schema Overview
+## Trace Schema Overview (Advanced Contract Details)
+If you are evaluating quickly, you can skip this section on first read and return when integrating artifacts into tooling.
+
 Decision outcomes (v0.1):
 - `ALLOW`
 - `REVIEW_REQUIRED`
@@ -237,7 +245,7 @@ Top-level trace provenance fields:
 - `trace_id`: workflow trace lineage id.
 - `run_id`: backward-compatible alias of `current_run_id`.
 - `current_run_id`: latest run id present in events.
-- `artifact_run_id`: CLI invocation id that wrote this artifact.
+- `artifact_run_id`: writer run id for this emitted artifact (the local CLI invocation that wrote the file).
 - `run_ids`: ordered unique run ids seen in `events[*].run_id`.
 
 `final_summary.payload` includes:
