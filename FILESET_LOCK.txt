@@ -1,0 +1,65 @@
+CAPS Guard public-repo export lock
+
+Core docs:
+- README.md
+- MVP_GUARD_ROADMAP.md
+- mvpguardpolish.md
+
+CLI + tests:
+- scripts/caps_guard.py
+- scripts/regression_suite.py
+
+Runtime entry:
+- src/main.py
+- src/config.py
+
+Manifests:
+- src/manifest.json
+- src/manifest_args_demo.json
+- src/manifest_side_effect_demo.json
+
+Core modules:
+- src/core/entity_extract.py
+- src/core/execution_runtime.py
+- src/core/langgraph_flow.py
+- src/core/manifest_loader.py
+- src/core/mcp.py
+- src/core/policy_engine.py
+- src/core/task_graph_builder.py
+- src/core/task_graph_compiler.py
+- src/core/task_graph_verifier.py
+
+Adapters:
+- src/adapters/base.py
+- src/adapters/location_api.py
+- src/adapters/weather_api.py
+- src/adapters/identity_api.py
+- src/adapters/messaging_api.py
+- src/adapters/email_api.py
+- src/adapters/calendar_api.py
+
+LLM client:
+- src/llm/ollama_client.py
+
+Schemas:
+- src/schemas/action_parse.py
+- src/schemas/cir.py
+- src/schemas/execution_plan.py
+- src/schemas/structured_intent.py
+- src/schemas/task_graph.py
+
+Package markers:
+- src/adapters/__init__.py
+- src/core/__init__.py
+- src/llm/__init__.py
+- src/schemas/__init__.py
+
+Repo hygiene:
+- .gitignore
+- requirements.txt
+
+Validation run in new repo:
+- python -m py_compile src/main.py scripts/caps_guard.py scripts/regression_suite.py src/core/langgraph_flow.py src/core/mcp.py src/core/execution_runtime.py src/core/policy_engine.py
+- python scripts/regression_suite.py --policy-only
+- python scripts/regression_suite.py --guard-only
+- python scripts/regression_suite.py --hitl-only  (requires local Ollama running)

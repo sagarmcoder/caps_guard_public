@@ -1,0 +1,57 @@
+{
+  "manifest_id": "caps-sidefx-demo",
+  "manifest_version": "1.0",
+  "tool_registry": [
+    {
+      "name": "location_api",
+      "binding": "location_api",
+      "description": "Resolve location identifiers and coordinates.",
+      "side_effect_class": "READ"
+    },
+    {
+      "name": "weather_api",
+      "binding": "weather_api",
+      "description": "Fetch weather data for a resolved location.",
+      "side_effect_class": "READ"
+    },
+    {
+      "name": "identity_api",
+      "binding": "identity_api",
+      "description": "Resolve recipient identities for messaging and email.",
+      "side_effect_class": "READ"
+    },
+    {
+      "name": "messaging_api",
+      "binding": "messaging_api",
+      "description": "Send outbound messages.",
+      "side_effect_class": "WRITE"
+    },
+    {
+      "name": "email_api",
+      "binding": "email_api",
+      "description": "Send outbound emails.",
+      "side_effect_class": "WRITE"
+    },
+    {
+      "name": "calendar_api",
+      "binding": "calendar_api",
+      "description": "Schedule calendar events.",
+      "side_effect_class": "IRREVERSIBLE"
+    }
+  ],
+  "sink_tools": [],
+  "review_policies": {
+    "sink_tools_require_review": false,
+    "write_tools_require_review": true,
+    "block_irreversible_tools": true,
+    "precedence": [
+      "BLOCK",
+      "REVIEW_REQUIRED",
+      "ALLOW"
+    ]
+  },
+  "constraint_flags": {
+    "enforce_tool_registry": true,
+    "allow_unknown_tools": false
+  }
+}

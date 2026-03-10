@@ -1,0 +1,28 @@
+{
+  "manifest_id": "caps-args-demo",
+  "manifest_version": "1.0",
+  "tool_registry": [
+    {
+      "name": "weather_api",
+      "binding": "weather_api",
+      "description": "Fetch weather data for a resolved location.",
+      "side_effect_class": "READ"
+    }
+  ],
+  "sink_tools": [],
+  "review_policies": {
+    "sink_tools_require_review": false,
+    "precedence": [
+      "BLOCK",
+      "REVIEW_REQUIRED",
+      "ALLOW"
+    ],
+    "forbidden_arg_patterns": [
+      "drop table"
+    ]
+  },
+  "constraint_flags": {
+    "enforce_tool_registry": true,
+    "allow_unknown_tools": false
+  }
+}
