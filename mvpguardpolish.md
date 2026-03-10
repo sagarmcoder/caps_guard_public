@@ -7,6 +7,13 @@ Recommended scope discipline:
 - Ship v0.1 with Guard + Trace + HITL + Manifest policies.
 - Do **not** include Slice D (env-aware rules) in v0.1 unless it is fully implemented and regression-covered.
 
+## Progress Status (Execution Order)
+- [x] Step 1: Section 2 README release-standard alignment
+- [ ] Step 2: Section 3 example-manifest/examples completeness and naming cleanup
+- [ ] Step 3: Section 4 guard contract freeze validation in README
+- [ ] Step 4: Section 6 packaging minimum (`Dockerfile` + local install/run path)
+- [ ] Step 5: Section 5 final proof pack + release gate evidence
+
 ## 1. Freeze Core Scope
 Release claim for v0.1:
 - Guardrails + audit-grade traces for tool-calling AI workflows.

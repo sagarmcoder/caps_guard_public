@@ -1,115 +1,121 @@
-# CAPS Project
+# CAPS Guard
 
-Context Action Planning Service
+Guardrails + audit-grade traces for tool-calling AI workflows.
 
-## Team
-- Sagar
+## What Problem It Solves
+AI workflows can make side-effect calls (message/email/calendar/etc.) without clear policy visibility.
+CAPS Guard enforces deterministic policy decisions at the tool boundary and emits trace artifacts that explain exactly what happened and why.
 
-## Architecture (Current)
+## Core Concepts
+### Tool Execution Boundary
+- Every tool step is evaluated before execution.
+- Decision outcomes are deterministic: `ALLOW`, `REVIEW_REQUIRED`, `BLOCK`.
 
-`User Prompt -> MCPService -> Action Parse (LLM) -> Reconcile/Normalize -> CIR -> Task Graph Builder -> Verifier -> Compiler -> Execution Plan`
+### Policy Decisions
+- Decisions are manifest-driven (`src/manifest*.json`), not hardcoded in runtime flow.
+- Precedence is deterministic (`BLOCK > REVIEW_REQUIRED > ALLOW`).
+- Decision payload includes `reason_code` and `rule_id` for auditability.
 
-Execution runtime path:
-- Dry-run executor validates resolver and branch behavior before live adapters.
-- Live adapter wiring is the next phase.
+### HITL Review
+- If policy returns `REVIEW_REQUIRED` for an actionable sink step, execution pauses.
+- Resume path uses explicit human decision (`approve` or `reject`).
 
-## Current Status
-- Action-parse-first pipeline is implemented and used by default.
-- Reconcile, verification, and compile gates are in place for deterministic planning.
-- Resolver gates are injected before side-effect steps (`resolve_location`, `resolve_recipient`).
-- Focused regression suite is implemented and passing.
-- Dry-run execution simulation is implemented and validated.
-- Manifest-backed guard + trace layer is implemented (`scripts/caps_guard.py`).
-- HITL review gating for sink tools is implemented with approve/reject paths.
+### Trace Artifacts
+- `trace.json`: canonical event log for decisions/tool calls/results/final summary.
+- `trace_graph.json`: deterministic nodes/edges execution-path view derived from `trace.json`.
 
-## Project Phases
-- Phase 0: Architecture baseline and interfaces
-- Phase 1: MCP <-> Ollama local vertical slice
-- Phase 2: Deterministic planning + execution hardening (in progress)
-- Phase 3: UI integration
-
-## Requirements
+## Install
+Requirements:
 - Python 3.10+
-- Ollama installed and running locally
-- An available local model, default:
-  - `ollama pull llama3.2:3b`
+- Ollama running locally (for prompt/langgraph paths)
+- Pulled local model (default from `src/config.py`)
 
-## Run
+Setup:
 ```bash
-python3 src/main.py --prompt "Summarize this meeting in 3 bullet points"
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
 ```
 
-Optional flags:
-```bash
-python3 src/main.py --model llama3.2:3b --temperature 0.2 --prompt "hello"
-python3 src/main.py --prompt "..." --action-parse
-python3 src/main.py --prompt "..." --structured-intent
-```
-
-Environment defaults (optional):
-```bash
-export CAPS_DEFAULT_MODEL="llama3.2:3b"
-export CAPS_DEFAULT_TEMPERATURE="0.2"
-export CAPS_STRICT_MODE="true"
-```
-
-Strict mode can be toggled per run:
-```bash
-python3 src/main.py --prompt "..." --strict
-python3 src/main.py --prompt "..." --no-strict
-```
-
-## Regression Gate
-Run the focused 6-case regression suite before adapter changes:
-```bash
-python3 scripts/regression_suite.py
-```
-
-Guard-only and policy-only gates:
-```bash
-python3 scripts/regression_suite.py --guard-only
-python3 scripts/regression_suite.py --policy-only
-```
-
-## Guard CLI (MVP)
-Execute guarded flows from a prompt or a plan:
-```bash
-python3 scripts/caps_guard.py execute --manifest src/manifest.json --prompt "If weather is below -20C in Toronto, text Jacob I am not coming to university today."
-python3 scripts/caps_guard.py execute --manifest src/manifest.json --plan /tmp/caps_guard_rw_demo.json --output-dir /tmp/caps_guard_demo
-```
-
-Full-loop prompt review demo (pause + resume on same thread):
-```bash
-python3 scripts/caps_guard.py execute --manifest src/manifest.json --prompt "If weather is below -20C in Toronto, text Jacob I am not coming to university today." --thread-id guard-demo-1 --sqlite-path .caps_guard_demo.sqlite --output-dir /tmp/guard_demo_block
-python3 scripts/caps_guard.py execute --manifest src/manifest.json --resume-review approve --thread-id guard-demo-1 --sqlite-path .caps_guard_demo.sqlite --output-dir /tmp/guard_demo_approve
-```
-
+## Quickstart
 Policy check without execution:
 ```bash
-python3 scripts/caps_guard.py check --manifest src/manifest.json --tool messaging_api --args-json '{"message":"hello"}'
+python scripts/caps_guard.py check \
+  --manifest src/manifest.json \
+  --tool messaging_api \
+  --args-json '{"message":"hello"}' \
+  --output-dir /tmp/guard_check_demo
 ```
 
-### Guard Artifacts
-`execute` emits:
-- `result.json`
-- `trace.json`
-- `trace_graph.json`
-- `summary.txt`
+Plan execution (no prompt parsing needed):
+```bash
+python scripts/caps_guard.py execute \
+  --manifest src/manifest.json \
+  --plan /tmp/caps_guard_rw_demo.json \
+  --output-dir /tmp/guard_execute_demo
+```
 
-`trace.json` canonical event types:
+## End-to-End Demo Flow
+Use this exact flow for v0.1 demo (pause on sink, then approve):
+
+```bash
+rm -f .caps_guard_demo.sqlite
+rm -rf /tmp/section9_block /tmp/section9_approve
+
+python scripts/caps_guard.py execute \
+  --manifest src/manifest.json \
+  --prompt "If weather is below 100C in Toronto, text Jacob I am not coming to university today." \
+  --thread-id demo1 \
+  --sqlite-path .caps_guard_demo.sqlite \
+  --output-dir /tmp/section9_block \
+  > /tmp/section9_block_stdout.json
+
+python scripts/caps_guard.py execute \
+  --manifest src/manifest.json \
+  --resume-review approve \
+  --thread-id demo1 \
+  --sqlite-path .caps_guard_demo.sqlite \
+  --output-dir /tmp/section9_approve \
+  > /tmp/section9_approve_stdout.json
+```
+
+Inspect artifacts:
+```bash
+cat /tmp/section9_block/trace.json
+cat /tmp/section9_approve/trace.json
+cat /tmp/section9_approve/trace_graph.json
+```
+
+Expected behavior:
+- First run pauses before sink execution (`pending_review=true`, `paused_for_review=true`).
+- Resume run emits `review_resume` and completes sink execution.
+- `trace_id` remains stable across pause/resume for the same thread.
+
+Blocked demo (`ARGS_FORBIDDEN_PATTERN`):
+```bash
+python scripts/caps_guard.py check \
+  --manifest src/manifest_args_demo.json \
+  --tool weather_api \
+  --args-json '{"query":"drop table users"}' \
+  --output-dir /tmp/args_demo_check
+```
+
+## Trace Schema Overview
+Canonical event types in `trace.json`:
 - `decision`
-- `review_resume`
 - `tool_call`
 - `tool_result`
+- `review_resume`
 - `final_summary`
 
-`trace.json` run provenance fields:
-- `run_id`: backward-compatible alias of `current_run_id`
-- `current_run_id`: latest execution run id present in events
-- `artifact_run_id`: CLI invocation id that wrote the artifact
-- `run_ids`: ordered unique run ids seen in `events[*].run_id`
+Top-level trace provenance fields:
+- `trace_id`: workflow trace lineage id.
+- `run_id`: backward-compatible alias of `current_run_id`.
+- `current_run_id`: latest run id present in events.
+- `artifact_run_id`: CLI invocation id that wrote this artifact.
+- `run_ids`: ordered unique run ids seen in `events[*].run_id`.
 
-`final_summary.payload` canonical fields:
+`final_summary.payload` includes:
 - `decision_counts`
 - `tool_call_count`
 - `tool_result_count`
@@ -120,42 +126,33 @@ python3 scripts/caps_guard.py check --manifest src/manifest.json --tool messagin
 - `sink_step_count`
 - `execution_result_count`
 
-`execution_result_count` semantics:
-- This is phase-local, not global across all prior runs.
-- For the blocked/pending-review artifact, it counts safe-phase execution results produced before sink execution.
-- For the approve/resume artifact, it counts sink-phase execution results produced during the resumed run.
-- Use `trace.json.events` + `run_ids` for full cross-run accounting; use `execution_result_count` for the current artifact phase summary.
+`execution_result_count` contract:
+- It is phase-local to the current artifact summary (not a global cross-run counter).
+- For a blocked/pending-review artifact, it reflects safe-phase results.
+- For an approve/resume artifact, it reflects resumed sink-phase results.
+- Use `trace.json.events` + `run_ids` for cross-run accounting.
 
-`trace_graph.json` is a deterministic nodes/edges view built from `trace.json`:
-- `nodes`: one node per event (ordered)
-- `edges`: linear `next` edges between ordered nodes
-- `summary`: `node_count`, `edge_count`, `event_count`
+Schema stability statement (v0.1):
+- `trace.json` event contract and top-level provenance fields are treated as stable for v0.1.
+- New fields may be added, but existing documented fields are not intended to be renamed/removed in v0.1.
 
-## Dry-Run Execution
-Simulate compiled plan execution without real adapters:
+## Current Limitations
+- Works for the current supported tool/step model.
+- New tools require manifest policy coverage and adapter coverage.
+- `trace_graph.json` is an execution-path graph (sequential nodes/edges), not a full branch tree.
+- Env-aware policy matrix (`dev/stage/prod`) is post-v0.1.
+- Hosted review workflows are out of scope for v0.1.
+
+## Roadmap / What’s Next
+- Post-v0.1 Slice D: env-aware policy hardening (`prod`-sensitive rules).
+- Branch-aware trace graph evolution (`trace_graph_v2.json`).
+- Lightweight graph renderer (`trace_graph.json` -> HTML/SVG) for demo UX.
+
+## Regression Gates
+Run before release:
 ```bash
-python3 src/main.py --prompt "If weather is below -20C in Toronto, text Jacob I am not coming to university today." > /tmp/caps_out.json
-python3 src/core/execution_dry_run.py --input /tmp/caps_out.json --temp-c -25 --time 16:20
+python -m py_compile src/main.py scripts/caps_guard.py scripts/regression_suite.py src/core/langgraph_flow.py src/core/mcp.py src/core/execution_runtime.py src/core/policy_engine.py
+python scripts/regression_suite.py --policy-only
+python scripts/regression_suite.py --guard-only
+python scripts/regression_suite.py --hitl-only
 ```
-
-## Docs
-- Problem definition: `PROBLEM_DEFINITION.md`
-- Delivery phases: `PHASES.md`
-- System-level flow diagrams: `SYSTEM_FLOW.md`
-- Finalized phase-2 architecture/use-cases/backlog: `USE_CASES_AND_FLOW.md`
-- Shareable project summary: `SHAREABLE_REPORT.md`
-- Resolver contracts: `RESOLVER_CONTRACTS.md`
-- RAG integration path: `RAG_integ_path.md`
-
-## General Capability Roadmap
-CAPS is being built as a general worker, not a single-use flow.
-
-Planned intent coverage includes:
-- Calendar scheduling and updates
-- Email summarization and conditional send flows
-- Weather/notification automation
-- Multi-step API workflows with conditions
-- Broader system-integrated task orchestration
-
-Implementation note:
-- CAPS keeps a verification-first boundary: parser output is never executed directly.
