@@ -135,12 +135,42 @@ python scripts/caps_guard.py check \
 ```
 
 ## Trace Schema Overview
+Decision outcomes (v0.1):
+- `ALLOW`
+- `REVIEW_REQUIRED`
+- `BLOCK`
+
+Canonical reason codes (v0.1, bounded set):
+- `TOOL_ALLOWLISTED`
+- `NON_TOOL_STEP`
+- `TOOL_DENYLISTED`
+- `SINK_REQUIRES_REVIEW`
+- `ARGS_FORBIDDEN_PATTERN`
+- `TOOL_UNKNOWN`
+- `TOOL_NOT_ALLOWED`
+- `POLICY_CONFLICT_RESOLVED`
+- `REVIEW_POLICY_MATCHED`
+- `EXECUTION_ERROR`
+
 Canonical event types in `trace.json`:
 - `decision`
 - `tool_call`
 - `tool_result`
 - `review_resume`
 - `final_summary`
+
+`decision` event payload fields:
+- `decision`
+- `reason_code`
+- `rule_id`
+- `manifest_id`
+- `manifest_version`
+- `timestamp_ms`
+- `precedence_resolved` (optional)
+- `resolution_reason_code` (optional)
+- `winning_decision` (optional)
+- `winning_reason_code` (optional)
+- `winning_rule_id` (optional)
 
 Top-level trace provenance fields:
 - `trace_id`: workflow trace lineage id.
