@@ -9,6 +9,7 @@ CAPS Guard enforces deterministic policy decisions at the tool boundary and emit
 ## Who This Is For / When To Use It
 CAPS Guard is for developers building tool-calling AI workflows who want deterministic policy checks, human approval for risky actions, and auditable traces at the execution boundary.
 v0.1 works best when your tool/API calls can be routed through CAPS manifests and adapters. It is not yet a drop-in wrapper for every existing agent framework.
+Best fit: teams that control their tool execution layer and can integrate at that boundary.
 
 ## What This Is / What This Is Not
 What this is:
@@ -29,6 +30,7 @@ In practice, that means:
 - Register tools in a manifest.
 - Define policy coverage for those tools.
 - Use CAPS adapters directly, or wrap existing tool/API calls so CAPS Guard evaluates them before execution.
+This is deliberate for v0.1: CAPS Guard is an integration boundary, not a zero-config global wrapper.
 
 New tools require two things:
 - Manifest coverage: define tool name, side-effect class, sink behavior, and relevant policies.
@@ -46,10 +48,12 @@ You probably cannot use it directly yet if:
 - You expect automatic support for arbitrary tools without manifest/adapter mapping.
 
 ## Install
-Requirements:
+Core requirements (for `check` and `execute --plan`):
 - Python 3.10+
-- Ollama running locally (only for prompt/langgraph paths)
-- Pulled local model (default from `src/config.py`)
+
+Prompt mode add-ons (for `execute --prompt` only):
+- Ollama running locally.
+- Pulled local model (default from `src/config.py`).
 
 Setup:
 ```bash
