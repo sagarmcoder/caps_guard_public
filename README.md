@@ -41,7 +41,7 @@ pip install -r requirements.txt
 Policy check without execution:
 ```bash
 python scripts/caps_guard.py check \
-  --manifest src/manifest.json \
+  --manifest src/manifest_demo.json \
   --tool messaging_api \
   --args-json '{"message":"hello"}' \
   --output-dir /tmp/guard_check_demo
@@ -50,9 +50,43 @@ python scripts/caps_guard.py check \
 Plan execution (no prompt parsing needed):
 ```bash
 python scripts/caps_guard.py execute \
-  --manifest src/manifest.json \
-  --plan /tmp/caps_guard_rw_demo.json \
+  --manifest src/manifest_demo.json \
+  --plan examples/plan_rw_demo.json \
   --output-dir /tmp/guard_execute_demo
+```
+
+## Example Manifest Profiles
+Use these profiles to validate the three v0.1 policy proofs:
+
+- `src/manifest_demo.json`: primary profile (alias of default policy profile used for demos).
+- `src/manifest_side_effect_demo.json`: side-effect class policy proof:
+  - `WRITE` non-sink -> `REVIEW_REQUIRED` (`rule_id=REVIEW_WRITE_CLASS`)
+  - `IRREVERSIBLE` -> `BLOCK` (`rule_id=BLOCK_IRREVERSIBLE`)
+- `src/manifest_args_demo.json`: argument-level block proof:
+  - forbidden args -> `BLOCK` (`reason_code=ARGS_FORBIDDEN_PATTERN`)
+
+Side-effect class proof commands:
+```bash
+python scripts/caps_guard.py check \
+  --manifest src/manifest_side_effect_demo.json \
+  --tool messaging_api \
+  --args-json '{"message":"hi"}' \
+  --output-dir /tmp/sidefx_check_write
+
+python scripts/caps_guard.py check \
+  --manifest src/manifest_side_effect_demo.json \
+  --tool calendar_api \
+  --args-json '{"title":"deploy"}' \
+  --output-dir /tmp/sidefx_check_irrev
+```
+
+Argument-block proof command:
+```bash
+python scripts/caps_guard.py check \
+  --manifest src/manifest_args_demo.json \
+  --tool weather_api \
+  --args-json '{"query":"drop table users"}' \
+  --output-dir /tmp/args_demo_check
 ```
 
 ## End-to-End Demo Flow
@@ -63,7 +97,7 @@ rm -f .caps_guard_demo.sqlite
 rm -rf /tmp/section9_block /tmp/section9_approve
 
 python scripts/caps_guard.py execute \
-  --manifest src/manifest.json \
+  --manifest src/manifest_demo.json \
   --prompt "If weather is below 100C in Toronto, text Jacob I am not coming to university today." \
   --thread-id demo1 \
   --sqlite-path .caps_guard_demo.sqlite \
@@ -71,7 +105,7 @@ python scripts/caps_guard.py execute \
   > /tmp/section9_block_stdout.json
 
 python scripts/caps_guard.py execute \
-  --manifest src/manifest.json \
+  --manifest src/manifest_demo.json \
   --resume-review approve \
   --thread-id demo1 \
   --sqlite-path .caps_guard_demo.sqlite \

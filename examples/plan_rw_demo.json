@@ -1,0 +1,51 @@
+{
+  "execution_plan": {
+    "schema_version": "1.0",
+    "plan_id": "plan_guard_rw_demo",
+    "intent": "action_parse",
+    "requires_tools": true,
+    "steps": [
+      {
+        "id": "step_1",
+        "type": "resolve_recipient",
+        "description": "Resolve recipient identity before sending message.",
+        "requires_tool": true,
+        "tool_name": "identity_api",
+        "input_keys": ["params"],
+        "condition": null
+      },
+      {
+        "id": "step_2",
+        "type": "send_message",
+        "description": "Send message action.",
+        "requires_tool": true,
+        "tool_name": "messaging_api",
+        "input_keys": ["params"],
+        "condition": null
+      }
+    ],
+    "final_action": "return_response",
+    "notes": []
+  },
+  "task_graph": {
+    "schema_version": "1.0",
+    "graph_id": "graph_guard_rw_demo",
+    "intent": "action_parse",
+    "tasks": [
+      {
+        "id": "t1",
+        "action": "send_message",
+        "params": {
+          "recipient_ref": "Jacob",
+          "recipient_resolved": false,
+          "message": "Hello from CAPS Guard"
+        },
+        "depends_on": [],
+        "condition": null,
+        "side_effect": true
+      }
+    ],
+    "needs_clarification": false,
+    "clarification_questions": []
+  }
+}

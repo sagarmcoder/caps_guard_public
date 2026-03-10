@@ -15,8 +15,12 @@ Runtime entry:
 
 Manifests:
 - src/manifest.json
+- src/manifest_demo.json
 - src/manifest_args_demo.json
 - src/manifest_side_effect_demo.json
+
+Examples:
+- examples/plan_rw_demo.json
 
 Core modules:
 - src/core/entity_extract.py
