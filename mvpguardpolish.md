@@ -11,8 +11,15 @@ Recommended scope discipline:
 - [x] Step 1: Section 2 README release-standard alignment
 - [x] Step 2: Section 3 example-manifest/examples completeness and naming cleanup
 - [x] Step 3: Section 4 guard contract freeze validation in README
-- [ ] Step 4: Section 6 packaging minimum (`Dockerfile` + local install/run path)
+- [x] Step 4: Section 6 packaging minimum (`Dockerfile` + local install/run path)
 - [ ] Step 5: Section 5 final proof pack + release gate evidence
+
+Step 4 validation evidence:
+- Docker image build succeeded (`docker build -t caps-guard:local .`).
+- Container CLI entrypoint verified (`docker run --rm caps-guard:local --help`).
+- Containerized blocked-policy check verified:
+  - `docker run --rm caps-guard:local check --manifest src/manifest_args_demo.json --tool weather_api --args-json '{"query":"drop table users"}'`
+  - Expected output observed: `decision=BLOCK`, `reason_code=ARGS_FORBIDDEN_PATTERN`, deterministic `rule_id`.
 
 ## 1. Freeze Core Scope
 Release claim for v0.1:

@@ -37,6 +37,12 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
+Docker (optional):
+```bash
+docker build -t caps-guard:local .
+docker run --rm caps-guard:local --help
+```
+
 ## Quickstart
 Policy check without execution:
 ```bash
@@ -83,6 +89,15 @@ python scripts/caps_guard.py check \
 Argument-block proof command:
 ```bash
 python scripts/caps_guard.py check \
+  --manifest src/manifest_args_demo.json \
+  --tool weather_api \
+  --args-json '{"query":"drop table users"}' \
+  --output-dir /tmp/args_demo_check
+```
+
+Containerized check demo (no local Python env needed):
+```bash
+docker run --rm caps-guard:local check \
   --manifest src/manifest_args_demo.json \
   --tool weather_api \
   --args-json '{"query":"drop table users"}' \
