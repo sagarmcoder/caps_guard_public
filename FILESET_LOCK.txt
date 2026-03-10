@@ -2,8 +2,8 @@ CAPS Guard public-repo export lock
 
 Core docs:
 - README.md
-- MVP_GUARD_ROADMAP.md
-- mvpguardpolish.md
+- ROADMAP.md
+- TRACE_SCHEMA.md
 
 CLI + tests:
 - scripts/caps_guard.py
@@ -21,6 +21,8 @@ Manifests:
 
 Examples:
 - examples/plan_rw_demo.json
+- examples/langgraph_demo/README.md
+- examples/langgraph_demo/run_demo.sh
 
 Core modules:
 - src/core/entity_extract.py

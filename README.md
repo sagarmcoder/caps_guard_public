@@ -1,7 +1,7 @@
 # CAPS Guard
 
-Guardrails + audit-grade traces for tool-calling AI workflows.
-Standalone guardrail + audit layer dev tool (v0.1).
+If your team runs LLM or agent workflows that make real-world API calls, CAPS Guard gives you deterministic policy enforcement, human approval gates, and full audit traces at the execution boundary.
+CAPS Guard is extracted from CAPS ("Context Action Planning Service"), my broader private project. This repo is the standalone guardrail + audit layer — published as an independent dev tool.
 
 ## What Problem It Solves
 AI workflows can make side-effect calls (message/email/calendar/etc.) without clear policy visibility.
@@ -11,7 +11,8 @@ CAPS Guard enforces deterministic policy decisions at the tool boundary and emit
 - Audience: developers/teams building tool-calling workflows who control the execution boundary.
 - Value: deterministic policy decisions (`ALLOW | REVIEW_REQUIRED | BLOCK`), HITL for risky actions, and auditable trace artifacts.
 - Adoption model: register tools in manifests and route calls through CAPS adapters or thin wrappers.
-- Fastest trial path: run `check` and `execute --plan` first; prompt flow is richer and needs local model runtime.
+- Fastest trial path: run `check` and `execute --plan` first (no Ollama/model needed).
+- Prompt flow (`execute --prompt`) needs local Ollama + model.
 
 ## Who This Is For / When To Use It
 CAPS Guard is for developers building tool-calling AI workflows who want deterministic policy checks, human approval for risky actions, and auditable traces at the execution boundary.
@@ -252,6 +253,11 @@ python scripts/caps_guard.py check \
 ```
 
 ## Core Concepts
+Architecture visuals:
+
+![Execution Flow](Capsguardexecutionflowchart.png)
+![Artifact Output Chain](capsguardartifactoutputchainflowchart.png)
+
 ### Tool Execution Boundary
 - Every tool step is evaluated before execution.
 - Decision outcomes are deterministic: `ALLOW`, `REVIEW_REQUIRED`, `BLOCK`.
@@ -269,73 +275,9 @@ python scripts/caps_guard.py check \
 - `trace.json`: canonical event log for decisions/tool calls/results/final summary.
 - `trace_graph.json`: deterministic nodes/edges execution-path view derived from `trace.json`.
 
-## Trace Schema Overview (Advanced Contract Details)
-If you are evaluating quickly, you can skip this section on first read and return when integrating artifacts into tooling.
-
-Decision outcomes (v0.1):
-- `ALLOW`
-- `REVIEW_REQUIRED`
-- `BLOCK`
-
-Canonical reason codes (v0.1, bounded set):
-- `TOOL_ALLOWLISTED`
-- `NON_TOOL_STEP`
-- `TOOL_DENYLISTED`
-- `SINK_REQUIRES_REVIEW`
-- `ARGS_FORBIDDEN_PATTERN`
-- `TOOL_UNKNOWN`
-- `TOOL_NOT_ALLOWED`
-- `POLICY_CONFLICT_RESOLVED`
-- `REVIEW_POLICY_MATCHED`
-- `EXECUTION_ERROR`
-
-Canonical event types in `trace.json`:
-- `decision`
-- `tool_call`
-- `tool_result`
-- `review_resume`
-- `final_summary`
-
-`decision` event payload fields:
-- `decision`
-- `reason_code`
-- `rule_id`
-- `manifest_id`
-- `manifest_version`
-- `timestamp_ms`
-- `precedence_resolved` (optional)
-- `resolution_reason_code` (optional)
-- `winning_decision` (optional)
-- `winning_reason_code` (optional)
-- `winning_rule_id` (optional)
-
-Top-level trace provenance fields:
-- `trace_id`: workflow trace lineage id.
-- `run_id`: backward-compatible alias of `current_run_id`.
-- `current_run_id`: latest run id present in events.
-- `artifact_run_id`: writer run id for this emitted artifact (the local CLI invocation that wrote the file).
-- `run_ids`: ordered unique run ids seen in `events[*].run_id`.
-
-`final_summary.payload` includes:
-- `decision_counts`
-- `tool_call_count`
-- `tool_result_count`
-- `tool_error_count`
-- `event_count`
-- `reviewed_tools`
-- `blocked_tools`
-- `sink_step_count`
-- `execution_result_count`
-
-`execution_result_count` contract:
-- It is phase-local to the current artifact summary (not a global cross-run counter).
-- For a blocked/pending-review artifact, it reflects safe-phase results.
-- For an approve/resume artifact, it reflects resumed sink-phase results.
-- Use `trace.json.events` + `run_ids` for cross-run accounting.
-
-Schema stability statement (v0.1):
-- `trace.json` event contract and top-level provenance fields are treated as stable for v0.1.
-- New fields may be added, but existing documented fields are not intended to be renamed/removed in v0.1.
+## Trace Schema
+Advanced trace/event contract details live in:
+- `TRACE_SCHEMA.md`
 
 ## Current Limitations
 - Supports the current tool/step model.

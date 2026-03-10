@@ -12,8 +12,8 @@ COPY src /app/src
 COPY scripts /app/scripts
 COPY examples /app/examples
 COPY README.md /app/README.md
-COPY MVP_GUARD_ROADMAP.md /app/MVP_GUARD_ROADMAP.md
-COPY mvpguardpolish.md /app/mvpguardpolish.md
+COPY ROADMAP.md /app/ROADMAP.md
+COPY TRACE_SCHEMA.md /app/TRACE_SCHEMA.md
 
 ENV PYTHONPATH=/app/src
 
