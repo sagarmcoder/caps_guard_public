@@ -184,6 +184,11 @@ Inspect artifacts:
 cat /tmp/section9_block/trace.json
 cat /tmp/section9_approve/trace.json
 cat /tmp/section9_approve/trace_graph.json
+
+python scripts/caps_guard.py render-trace \
+  --trace /tmp/section9_approve/trace.json \
+  --output /tmp/section9_approve/trace_render.html \
+  --title "CAPS Guard Section9 Trace"
 ```
 
 Expected behavior:
@@ -195,6 +200,22 @@ Expected behavior:
 - `check` and `execute --plan` paths do not require prompt parsing.
 - Prompt-driven execution (`execute --prompt`) uses the LangGraph pipeline and local model/runtime configuration.
 - Keep Ollama available when using prompt mode.
+- A ready-to-run LangGraph demo is available at `examples/langgraph_demo/README.md`.
+
+## Mini Trace Renderer (v0.1 additive)
+Render any `trace.json` artifact into a shareable static HTML timeline:
+
+```bash
+python scripts/caps_guard.py render-trace \
+  --trace /tmp/section9_approve/trace.json \
+  --output /tmp/section9_approve/trace_render.html \
+  --title "CAPS Guard Trace"
+```
+
+What it shows:
+- Event cards in execution order.
+- Decision color cues (`ALLOW` green, `REVIEW_REQUIRED` yellow, `BLOCK` red).
+- Hover detail payload (reason code, rule id, run id, timestamps, args when present).
 
 ## Example Manifest Profiles
 Use these profiles to validate v0.1 policy proofs:

@@ -1472,6 +1472,87 @@ def _check_guard_args_forbidden_pattern_flow() -> None:
         _assert((final_event.get("payload", {}) or {}).get("blocked") is True, "guard args: final summary should be blocked")
 
 
+def _check_guard_trace_renderer_flow() -> None:
+    with tempfile.TemporaryDirectory(prefix="caps_guard_render_") as td:
+        base = Path(td)
+        plan_file = base / "plan_render.json"
+        plan_file.write_text(
+            json.dumps(
+                {
+                    "execution_plan": {
+                        "schema_version": "1.0",
+                        "plan_id": "plan_render_guard",
+                        "intent": "action_parse",
+                        "requires_tools": False,
+                        "steps": [
+                            {
+                                "id": "step_1",
+                                "type": "build_response",
+                                "description": "Build deterministic response.",
+                                "requires_tool": False,
+                                "tool_name": None,
+                                "input_keys": ["execution_results"],
+                                "condition": None,
+                            }
+                        ],
+                        "final_action": "return_response",
+                        "notes": [],
+                    },
+                    "task_graph": {
+                        "schema_version": "1.0",
+                        "graph_id": "graph_render_guard",
+                        "intent": "action_parse",
+                        "tasks": [],
+                        "needs_clarification": False,
+                        "clarification_questions": [],
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        exec_dir = base / "execute"
+        exec_payload = _run_guard(
+            [
+                "execute",
+                "--manifest",
+                "src/manifest.json",
+                "--plan",
+                str(plan_file),
+                "--output-dir",
+                str(exec_dir),
+            ]
+        )
+        trace_json = Path((exec_payload.get("artifacts", {}) or {}).get("trace_json", ""))
+        _assert(trace_json.exists(), "guard renderer: expected trace.json from execute")
+
+        html_output = base / "trace_render.html"
+        render_payload = _run_guard(
+            [
+                "render-trace",
+                "--trace",
+                str(trace_json),
+                "--output",
+                str(html_output),
+                "--title",
+                "Regression Trace Render",
+            ]
+        )
+        artifacts = render_payload.get("artifacts", {}) or {}
+        _assert(
+            Path(artifacts.get("html", "")).exists(),
+            "guard renderer: command should emit output HTML artifact",
+        )
+        html_text = html_output.read_text(encoding="utf-8")
+        _assert("Regression Trace Render" in html_text, "guard renderer: missing custom title in output")
+        _assert("event-card" in html_text, "guard renderer: missing event card structure in output")
+        _assert("trace_id" in html_text, "guard renderer: missing trace metadata in output")
+        _assert(
+            "tool_result" in html_text or "final_summary" in html_text,
+            "guard renderer: expected trace event content in output",
+        )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run CAPS focused regression prompts (requires local Ollama).")
     parser.add_argument("--cycle-only", action="store_true", help="Run only compiler cycle guard test (no Ollama needed).")
@@ -1592,6 +1673,12 @@ def main() -> None:
         except Exception as exc:  # noqa: BLE001
             failures.append(f"guard_args_forbidden_pattern_flow: {exc}")
             print(f"[FAIL] guard_args_forbidden_pattern_flow -> {exc}")
+        try:
+            _check_guard_trace_renderer_flow()
+            print("[PASS] guard_trace_renderer_flow")
+        except Exception as exc:  # noqa: BLE001
+            failures.append(f"guard_trace_renderer_flow: {exc}")
+            print(f"[FAIL] guard_trace_renderer_flow -> {exc}")
 
         if failures:
             print("\nRegression failures:")
@@ -1672,6 +1759,12 @@ def main() -> None:
     except Exception as exc:  # noqa: BLE001
         failures.append(f"guard_args_forbidden_pattern_flow: {exc}")
         print(f"[FAIL] guard_args_forbidden_pattern_flow -> {exc}")
+    try:
+        _check_guard_trace_renderer_flow()
+        print("[PASS] guard_trace_renderer_flow")
+    except Exception as exc:  # noqa: BLE001
+        failures.append(f"guard_trace_renderer_flow: {exc}")
+        print(f"[FAIL] guard_trace_renderer_flow -> {exc}")
 
 
     if failures:

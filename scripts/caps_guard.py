@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import html
 import json
 import os
 import sys
@@ -293,6 +294,192 @@ def _print_payload(payload: Dict[str, Any], fmt: str) -> None:
     print(json.dumps(payload, indent=2))
 
 
+def _decision_color(decision: str | None) -> str:
+    if decision == "ALLOW":
+        return "#2e8b57"
+    if decision == "REVIEW_REQUIRED":
+        return "#d4a017"
+    if decision == "BLOCK":
+        return "#c0392b"
+    return "#5f6b7a"
+
+
+def _render_trace_html(trace_payload: Dict[str, Any], title: str) -> str:
+    events = trace_payload.get("events", []) or []
+    cards: List[str] = []
+    edge_blocks: List[str] = []
+
+    for idx, event in enumerate(events):
+        payload = event.get("payload", {}) or {}
+        decision = payload.get("decision")
+        color = _decision_color(decision if isinstance(decision, str) else None)
+        event_type = str(event.get("event_type", "unknown"))
+        step_id = event.get("step_id")
+        tool_name = event.get("tool_name")
+        reason_code = payload.get("reason_code")
+        rule_id = payload.get("rule_id")
+        timestamp = event.get("timestamp_ms")
+        run_id = event.get("run_id")
+
+        # Keep params visible for tool_call nodes without flooding the card body.
+        args_blob = None
+        if event_type == "tool_call":
+            args_blob = payload.get("params")
+        tooltip_payload = {
+            "event_type": event_type,
+            "decision": decision,
+            "reason_code": reason_code,
+            "rule_id": rule_id,
+            "step_id": step_id,
+            "tool_name": tool_name,
+            "timestamp_ms": timestamp,
+            "run_id": run_id,
+            "args": args_blob,
+        }
+        tooltip = html.escape(json.dumps(tooltip_payload, indent=2, sort_keys=True))
+
+        cards.append(
+            (
+                '<div class="event-card" style="border-left: 6px solid {color}" title="{tooltip}">'
+                '<div class="event-head">#{idx} {event_type}</div>'
+                '<div class="event-meta"><b>step</b>: {step}</div>'
+                '<div class="event-meta"><b>tool</b>: {tool}</div>'
+                '<div class="event-meta"><b>decision</b>: {decision}</div>'
+                '<div class="event-meta"><b>reason</b>: {reason}</div>'
+                '<div class="event-meta"><b>rule</b>: {rule}</div>'
+                '</div>'
+            ).format(
+                color=color,
+                tooltip=tooltip,
+                idx=idx + 1,
+                event_type=html.escape(event_type),
+                step=html.escape(str(step_id)),
+                tool=html.escape(str(tool_name)),
+                decision=html.escape(str(decision)),
+                reason=html.escape(str(reason_code)),
+                rule=html.escape(str(rule_id)),
+            )
+        )
+
+        if idx < len(events) - 1:
+            edge_blocks.append(
+                (
+                    '<div class="edge-row">'
+                    '<span class="edge-line" style="background:{color}"></span>'
+                    '<span class="edge-label">{label}</span>'
+                    "</div>"
+                ).format(
+                    color=color,
+                    label=html.escape(str(decision if isinstance(decision, str) else event_type)),
+                )
+            )
+
+    summary = trace_payload.get("summary", {}) or {}
+    summary_blob = html.escape(json.dumps(summary, indent=2, sort_keys=True))
+    trace_id = html.escape(str(trace_payload.get("trace_id")))
+    current_run_id = html.escape(str(trace_payload.get("current_run_id", trace_payload.get("run_id"))))
+    run_ids = html.escape(json.dumps(trace_payload.get("run_ids", [])))
+
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{html.escape(title)}</title>
+  <style>
+    body {{
+      font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      margin: 0;
+      background: #f7f8fa;
+      color: #1f2937;
+    }}
+    .wrap {{ max-width: 1080px; margin: 0 auto; padding: 24px; }}
+    .header {{
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 18px;
+    }}
+    .meta {{ font-size: 13px; color: #4b5563; line-height: 1.6; }}
+    .summary {{
+      background: #111827;
+      color: #e5e7eb;
+      border-radius: 12px;
+      padding: 14px;
+      white-space: pre-wrap;
+      font-size: 12px;
+      margin-top: 12px;
+    }}
+    .event-card {{
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin: 10px 0;
+    }}
+    .event-head {{ font-weight: 700; margin-bottom: 6px; }}
+    .event-meta {{ font-size: 13px; color: #374151; margin: 2px 0; }}
+    .edge-row {{
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 4px 0 10px 8px;
+    }}
+    .edge-line {{
+      display: inline-block;
+      width: 36px;
+      height: 4px;
+      border-radius: 999px;
+    }}
+    .edge-label {{
+      font-size: 12px;
+      color: #6b7280;
+      text-transform: uppercase;
+      letter-spacing: .02em;
+    }}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="header">
+      <h1 style="margin:0 0 8px 0;">{html.escape(title)}</h1>
+      <div class="meta"><b>trace_id:</b> {trace_id}</div>
+      <div class="meta"><b>current_run_id:</b> {current_run_id}</div>
+      <div class="meta"><b>run_ids:</b> {run_ids}</div>
+      <div class="meta"><b>events:</b> {len(events)}</div>
+      <div class="summary">{summary_blob}</div>
+    </div>
+    {''.join(cards[:1] + [item for pair in zip(edge_blocks, cards[1:]) for item in pair] if cards else [])}
+  </div>
+</body>
+</html>
+"""
+
+
+def _run_render_trace(args: argparse.Namespace) -> int:
+    trace_payload = _load_json_file(args.trace)
+    events = trace_payload.get("events")
+    if not isinstance(events, list):
+        raise ValueError("trace file must contain an 'events' list")
+
+    output_path = Path(args.output)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    html_payload = _render_trace_html(trace_payload, title=args.title)
+    output_path.write_text(html_payload, encoding="utf-8")
+
+    response = {
+        "mode": "render-trace",
+        "artifacts": {
+            "trace_json": str(Path(args.trace)),
+            "html": str(output_path),
+        },
+        "summary_line": f"rendered {len(events)} events to {output_path}",
+    }
+    _print_payload(response, args.format)
+    return 0
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="CAPS Guard CLI")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -349,6 +536,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p_check.add_argument("--output-dir", default=None, help="Artifact directory")
     p_check.add_argument("--format", choices=["json", "text"], default="json")
+
+    p_render = sub.add_parser("render-trace", help="Render trace.json into a shareable HTML view.")
+    p_render.add_argument("--trace", required=True, help="Path to trace.json artifact")
+    p_render.add_argument("--output", required=True, help="Output HTML path")
+    p_render.add_argument("--title", default="CAPS Guard Trace", help="HTML page title")
+    p_render.add_argument("--format", choices=["json", "text"], default="json")
 
     return parser
 
@@ -621,6 +814,8 @@ def main() -> int:
         return _run_execute(args)
     if args.command == "check":
         return _run_check(args)
+    if args.command == "render-trace":
+        return _run_render_trace(args)
     raise ValueError(f"Unknown command: {args.command}")
 
 
