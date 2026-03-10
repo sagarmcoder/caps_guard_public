@@ -4,7 +4,6 @@ Context Action Planning Service
 
 ## Team
 - Sagar
-- Aneesh
 
 ## Architecture (Current)
 
